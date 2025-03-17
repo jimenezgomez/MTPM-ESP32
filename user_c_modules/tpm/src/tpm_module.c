@@ -3,48 +3,54 @@
 #include "esp_random.h"
 #include "esp_log.h"
 #include "./tpm_core/tpm_core.c"
+#include "./tpm_core/tpm_scenarios.c"
 
 typedef struct _TPM_obj_t {
     mp_obj_base_t base;
+    //TPMm Settings
     size_t h;
     size_t* k;
     size_t* n;
     uint8_t l;
     uint8_t m;
     uint8_t learn_rule;
-    int8_t* weights;
-    size_t weights_buffersize;
+    uint8_t scenario;
     size_t neuron_count;
 
+    //handlers
+    create_stimulus_fromOutput_t scenarioHandler;
+
+    //Buffers
+    int8_t* weights;
+    size_t weights_buffersize;
     int8_t* input_buffer; 
     size_t input_buffer_size;// This is K_0 * N_0 
     int8_t* output_buffer; //This is neuron_count size
-
     int8_t last_output;
-
-
 } TPM_obj_t;
 
 // This represents TPM.__new__ and TPM.__init__, which is called when
 // the user instantiates a TPM object.
 static mp_obj_t TPM_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     // Allocates the new object and sets the type.
-    mp_arg_check_num(n_args, n_kw, 6, 6, true); // Ensure the correct number of arguments
+    mp_arg_check_num(n_args, n_kw, 7, 7, true); // Ensure the correct number of arguments
     TPM_obj_t *self = mp_obj_malloc(TPM_obj_t, type);
 
     // Extract parameters from args
+    // H: Layer size
     size_t h = mp_obj_get_int(args[0]);
-    
-    
     if (!MP_OBJ_IS_TYPE(args[1], &mp_type_list)) {
         mp_raise_TypeError("Argument K must be a list");
     }
-
+    
+    //K: Neuron count for each layer
     mp_obj_list_t *list_k = MP_OBJ_TO_PTR(args[1]);
+    //Check size
     if(list_k->len != h) {
             mp_raise_ValueError("The number of layers (h) does not match the number of items inside k");
             return mp_const_none;
-        }
+    }
+    //Assign
     self->k = m_new(size_t, list_k->len);
     size_t neuron_count = 0;
     for (size_t i = 0; i < h; i++) {
@@ -56,18 +62,19 @@ static mp_obj_t TPM_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
             mp_raise_TypeError("List K items must be integers");
         }
     }
+    // if (!MP_OBJ_IS_TYPE(args[1], &mp_type_list)) {
+    //     mp_raise_TypeError("Argument K must be a list");
+    // }
 
-    if (!MP_OBJ_IS_TYPE(args[2], &mp_type_list)) {
-        mp_raise_TypeError("Argument K must be a list");
-    }
-
+    //N: Neuron input size for each layer
     mp_obj_list_t *list_n = MP_OBJ_TO_PTR(args[2]);
+    //Check size
     if(list_n->len != h) {
             mp_raise_ValueError("The number of layers (h) does not match the number of items inside n");
             return mp_const_none;
         }
+    //Assign
     self->n = m_new(size_t, list_n->len);
-
     for (size_t i = 0; i < h; i++) {
         mp_obj_t item = list_n->items[i];
         if (MP_OBJ_IS_INT(item)) {
@@ -77,7 +84,7 @@ static mp_obj_t TPM_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
         }
     }
 
-    
+    //Assign L, M LearnRule and Scenario
 
     uint8_t l = mp_obj_get_int(args[3]);
     uint8_t m = mp_obj_get_int(args[4]);
@@ -89,6 +96,18 @@ static mp_obj_t TPM_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
             break;
         default:
             mp_raise_ValueError("You must use the following numbers for the learning rules: \n\t- 0: Hebbian \n\t- 1: Anti-Hebbian \n\t- 2: Random-Walk \n\n");
+            return mp_const_none;
+    }
+    uint8_t scenario = mp_obj_get_int(args[6]);
+    switch (scenario){
+        case 0:
+            self->scenarioHandler = noOverlap_stimHandler;
+            break;
+        case 1:
+        case 2:
+            break;
+        default:
+            mp_raise_ValueError("You must use the following numbers for the Scenarios: \n\t- 0: Without overlap\n");
             return mp_const_none;
     }
 
@@ -106,6 +125,7 @@ static mp_obj_t TPM_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
     self->m = m;
     self->h = h;
     self->learn_rule = rule;
+    self->scenario = scenario;
     self->weights = w;
     self->weights_buffersize = buffersize;
     self->neuron_count = neuron_count;
@@ -162,7 +182,7 @@ static mp_obj_t TPM_calculate_output(mp_obj_t self_in, mp_obj_t input_array) {
         self->input_buffer[i] = casted_buffer[i];
     }    
 
-    self->last_output = calculate_network(self->k, self->n,self->h,self->input_buffer,self->output_buffer,self->weights,self->neuron_count);
+    self->last_output = calculate_network(self->k, self->n,self->h,self->input_buffer,self->output_buffer,self->weights,self->neuron_count, self->scenarioHandler);
     return mp_obj_new_int(self->last_output);
 }
 

@@ -1,5 +1,9 @@
 #include <math.h>
 
+//Learning rules and TPM Scenarios handler types
+typedef void (*create_stimulus_fromOutput_t)(int8_t* inputBuffer_layer, int8_t* outputBuffer_prevLayer, size_t k_layer, size_t n_layer);
+
+
 ///////////////////////////////////////////////////////////////
 //math helpers
 
@@ -92,18 +96,16 @@ int8_t calculate_tau(int8_t* input, size_t input_count){
     return tau;
 }
 
-int8_t calculate_network(size_t* k, size_t* n, size_t h, int8_t* input_buffer, int8_t* output_buffer, int8_t* weights_buffer, size_t neuron_count){
+int8_t calculate_network(size_t* k, size_t* n, size_t h, int8_t* input_buffer, int8_t* output_buffer, int8_t* weights_buffer, size_t neuron_count, create_stimulus_fromOutput_t scenarioHandler){
     
     uint8_t used_weights = 0;
     uint8_t used_neurons = 0;
-    size_t input_len = n[0]; //The amount of inputs is now defined by n[]
+    size_t input_len = n[0];
 
     for(uint8_t i = 0; i<h; i++){
         input_len = n[i];
         calculate_layer(input_buffer, input_len, &output_buffer[used_neurons], &weights_buffer[used_weights], k[i]); //No further transformation to the outputs in no_overlap
-        for(uint8_t j = 0; j<k[i]; j++){ //now set the input for the next iteration to the outputs of this layer
-            input_buffer[j] = output_buffer[used_neurons+j];
-        }
+        scenarioHandler(input_buffer, &output_buffer[used_neurons], k[i], n[i]);
 
         used_weights += k[i]*input_len; //this way we know where the layer starts in memory
         used_neurons += k[i]; //Used for tracking the output_buffer
@@ -128,8 +130,8 @@ void learn(size_t* k, uint8_t l,size_t h, int8_t* initial_input, size_t initial_
                 weights[weightIndex] = g_func(hebbian_rule(input[i],current_layer_output[j],local_output,external_output,weights[weightIndex]),l);
             }
         }
-        input = &output_buffer[output_index_start];
-        input_len = k[layerIndex];
+        input = &output_buffer[output_index_start]; //Set the input to this layers output
+        input_len = k[layerIndex]; //The amount of outputs equals the amount of neurons
         output_index_start += k[layerIndex];
         weight_index_start += k[layerIndex]*input_len;
     }
