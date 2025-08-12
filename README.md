@@ -4,6 +4,15 @@ This MicroPython C module provides a set of utilities to work with **Multilayer 
 It exposes a class `TPM` with methods for calculating outputs, performing learning steps, and retrieving network parameters and weights.
 
 Once the module is compiled and installed into MicroPython, the following API will be available.
+---
+
+## Project Structure
+
+The directory `mp_examples` contains two examples, one basic (`basic.py`) example that shows how to quickly get started, and `main.py`, which demonstrates how to use this library for synchronizing two neural networks using MQTT. `main.py` is meant to be used with the setup files found in the `setup` directory.
+
+The source is split in two: the module and the core. 
+
+**The module** contains all the definitions that expose the core functionality to the MicroPython user. It is all contained in the file `tpm/src/tpm_module.c`. **The core** is in the directory `tpm/src/tpm_core`. It contains mathematical operations as well as other auxiliary functions used for MTPM synchronization. These functions are required for learning, calculating the output of a network, calculating the size of the network (the buffersize of the weights array), among many other uses.  
 
 ---
 
@@ -139,11 +148,3 @@ Returns the MTPM’s flat weights array.
 * This module is intended for embedded use in ESP32 and similar microcontrollers running MicroPython.
 
 ---
-
-## Project Structure
-
-The directory `mp_examples` contains two examples, one basic (`basic.py`) example that shows how to quickly get started, and `main.py`, which demonstrates how to use this library for synchronizing two neural networks using MQTT. `main.py` is meant to be used with the setup files found in the `setup` directory.
-
-The source is split in two: the module and the core. 
-
-**The module** contains all the definitions that expose the core functionality to the MicroPython user. It is all contained in the file `tpm/src/tpm_module.c`. **The core** is in the directory `tpm/src/tpm_core`. It contains mathematical operations as well as other auxiliary functions used for MTPM synchronization. These functions are required for learning, calculating the output of a network, calculating the size of the network (the buffersize of the weights array), among many other uses.  
