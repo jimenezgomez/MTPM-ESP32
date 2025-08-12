@@ -1,3 +1,5 @@
 /esp-idf
 /micropython
 */network.json
+*/tests.c
+*/tests.bin

@@ -18,13 +18,14 @@ typedef struct _TPM_obj_t {
     size_t neuron_count;
 
     //handlers
-    create_stimulus_fromOutput_t scenarioHandler;
+    scenario_handler_t* scenarioHandler;
+    learnRule_handler_t* learnRuleHandler;
 
     //Buffers
     int8_t* weights;
     size_t weights_buffersize;
     int8_t* input_buffer; 
-    size_t input_buffer_size;// This is K_0 * N_0 
+    size_t input_buffersize;// This is K_0 * N_0 
     int8_t* output_buffer; //This is neuron_count size
     int8_t last_output;
 } TPM_obj_t;
@@ -42,6 +43,7 @@ static mp_obj_t TPM_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
     if (!MP_OBJ_IS_TYPE(args[1], &mp_type_list)) {
         mp_raise_TypeError("Argument K must be a list");
     }
+    self->h = h;
     
     //K: Neuron count for each layer
     mp_obj_list_t *list_k = MP_OBJ_TO_PTR(args[1]);
@@ -101,14 +103,23 @@ static mp_obj_t TPM_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
     uint8_t scenario = mp_obj_get_int(args[6]);
     switch (scenario){
         case 0:
-            self->scenarioHandler = noOverlap_stimHandler;
+            self->scenarioHandler = &noOverlap_Handler;
             break;
         case 1:
+            self->scenarioHandler = &partialOverlap_Handler;
+            break;
         case 2:
+            self->scenarioHandler = &fullOverlap_Handler;
             break;
         default:
             mp_raise_ValueError("You must use the following numbers for the Scenarios: \n\t- 0: Without overlap\n");
             return mp_const_none;
+    }
+
+    //Check if Structure is valid
+    if (self->scenarioHandler->check_structure(self->k,self->n, self->h) != true) {
+        mp_raise_ValueError("The provided structure is not valid.\n - Please check if the scenario, K or N arrays are correct.");
+        return mp_const_none;
     }
 
     //populate weights from parameters
@@ -123,14 +134,13 @@ static mp_obj_t TPM_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_
 
     self->l = l;
     self->m = m;
-    self->h = h;
     self->learn_rule = rule;
     self->scenario = scenario;
     self->weights = w;
     self->weights_buffersize = buffersize;
     self->neuron_count = neuron_count;
-    self->input_buffer_size = (self->n[0]*self->k[0]);
-    self->input_buffer = m_new(int8_t, self->input_buffer_size);
+    self->input_buffersize = (self->n[0]*self->k[0]);
+    self->input_buffer = m_new(int8_t, self->input_buffersize);
     self->output_buffer = m_new(int8_t, neuron_count);
     self->last_output = 0;
 
@@ -171,10 +181,10 @@ static mp_obj_t TPM_calculate_output(mp_obj_t self_in, mp_obj_t input_array) {
 
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(input_array, &bufinfo, MP_BUFFER_READ);
-    if (self->input_buffer_size != (bufinfo.len)) {
+    if (self->input_buffersize != (bufinfo.len)) {
         mp_raise_msg_varg(&mp_type_ValueError,
             MP_ERROR_TEXT("Input does not match n[0]: received=%d expected=%d"),
-            bufinfo.len, self->input_buffer_size); 
+            bufinfo.len, self->input_buffersize); 
         return mp_const_none;
     }
     int8_t* casted_buffer = (int8_t*)bufinfo.buf;
@@ -192,10 +202,10 @@ static mp_obj_t TPM_learn_output(mp_obj_t self_in, mp_obj_t input_array, mp_obj_
     TPM_obj_t *self = MP_OBJ_TO_PTR(self_in);
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(input_array, &bufinfo, MP_BUFFER_READ);
-    if (self->input_buffer_size != (bufinfo.len)) {
+    if (self->input_buffersize != (bufinfo.len)) {
         mp_raise_msg_varg(&mp_type_ValueError,
             MP_ERROR_TEXT("Input does not match n[0]: received=%d expected=%d"),
-            bufinfo.len, self->input_buffer_size); 
+            bufinfo.len, self->input_buffersize); 
         return mp_const_none;
     }
     int8_t* casted_buffer = (int8_t*)bufinfo.buf;
@@ -204,7 +214,7 @@ static mp_obj_t TPM_learn_output(mp_obj_t self_in, mp_obj_t input_array, mp_obj_
     }
     int8_t ext_output = mp_obj_get_int(external_output_mp);
     
-    learn(self->k,self->l,self->h,casted_buffer,self->input_buffer_size,self->output_buffer, self->last_output,ext_output,self->weights);
+    learn(self->k,self->l,self->h,casted_buffer,self->input_buffersize,self->output_buffer, self->last_output,ext_output,self->weights);
 
     return mp_const_none;
 }

@@ -146,16 +146,23 @@ int *generateRandomArray(int size, int min, int max) {
 
 int main() {
 
-    size_t k[2] = {4,2};
-    size_t n[2] = {2,2};
     size_t h = 2;
-    int input_buffer[8] = {1,1,1,1,1,1,1,1};
-    int weights[12] = {-1,1, -1,1, -1,1, -1,1, -1,1, -1,1};
-    int* output_buffer = malloc(3*sizeof(int));
-    size_t neuron_count = 12;
+    size_t k[2] = {8,2};
+    size_t n[2] = {2,4};
+    for(size_t i = h-1; i>0; i--){
+        if (k[i-1] != k[i]*n[i]) { 
+            printf("%d | %d\n",k[i-1],k[i]*n[i]);
+            return 0;
+        }
+    }
+    // int input_buffer[8] = {1,1,1,1,1,1,1,1};
+    // int weights[12] = {-1,1, -1,1, -1,1, -1,1, -1,1, -1,1};
+    // int* output_buffer = malloc(3*sizeof(int));
+    // size_t neuron_count = 12;
+    printf("ey yo");
     
-    int output = calculate_network(k,n,h,input_buffer,output_buffer,weights,neuron_count);
-    printf("%d\n",output);
+    // int output = calculate_network(k,n,h,input_buffer,output_buffer,weights,neuron_count);
+    // printf("%d\n",output);
     return 0;
 }
 

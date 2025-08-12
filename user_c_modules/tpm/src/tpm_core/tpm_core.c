@@ -1,7 +1,15 @@
 #include <math.h>
 
 //Learning rules and TPM Scenarios handler types
-typedef void (*create_stimulus_fromOutput_t)(int8_t* inputBuffer_layer, int8_t* outputBuffer_prevLayer, size_t k_layer, size_t n_layer);
+typedef struct{
+    void (*stimulus_fromOutput)(int8_t* inputBuffer_layer, int8_t* outputBuffer_prevLayer, size_t k_layer, size_t n_layer);
+    bool (*check_structure)(size_t* k, size_t* n, size_t h);
+} scenario_handler_t;
+
+typedef struct{
+    int8_t (*TPM_adjust_weights)(int8_t neuronInput, int8_t neuronOutput, int8_t outputLocal, int8_t outputExternal, int8_t weight);
+} learnRule_handler_t;
+
 
 
 ///////////////////////////////////////////////////////////////
@@ -96,7 +104,7 @@ int8_t calculate_tau(int8_t* input, size_t input_count){
     return tau;
 }
 
-int8_t calculate_network(size_t* k, size_t* n, size_t h, int8_t* input_buffer, int8_t* output_buffer, int8_t* weights_buffer, size_t neuron_count, create_stimulus_fromOutput_t scenarioHandler){
+int8_t calculate_network(size_t* k, size_t* n, size_t h, int8_t* input_buffer, int8_t* output_buffer, int8_t* weights_buffer, size_t neuron_count, scenario_handler_t* scenarioHandler){
     
     uint8_t used_weights = 0;
     uint8_t used_neurons = 0;
@@ -105,7 +113,7 @@ int8_t calculate_network(size_t* k, size_t* n, size_t h, int8_t* input_buffer, i
     for(uint8_t i = 0; i<h; i++){
         input_len = n[i];
         calculate_layer(input_buffer, input_len, &output_buffer[used_neurons], &weights_buffer[used_weights], k[i]); //No further transformation to the outputs in no_overlap
-        scenarioHandler(input_buffer, &output_buffer[used_neurons], k[i], n[i]);
+        scenarioHandler->stimulus_fromOutput(input_buffer, &output_buffer[used_neurons], k[i], n[i]);
 
         used_weights += k[i]*input_len; //this way we know where the layer starts in memory
         used_neurons += k[i]; //Used for tracking the output_buffer
